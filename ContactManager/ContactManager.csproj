@@ -22,4 +22,8 @@
     <ProjectReference Include="..\ContactManager.DAL\ContactManager.DAL.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="Enum\" />
+  </ItemGroup>
+
 </Project>
