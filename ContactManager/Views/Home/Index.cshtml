@@ -1,0 +1,263 @@
+﻿@model List<PersonDto>
+@{
+    ViewData["Title"] = "Home Page";
+}
+
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        margin: 20px;
+        padding: 0;
+        background-color: #f4f4f4;
+    }
+
+    input#filterInput {
+        width: 50%;
+    }
+
+    input[type="button"]:disabled {
+        background-color: #6c757d;
+        cursor: not-allowed;
+        opacity: 0.65;
+    }
+
+    button, input[type="button"] {
+        background-color: #28a745;
+        color: white;
+        border: none;
+        padding: 10px 15px;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+
+        button:hover, input[type="button"]:hover {
+            background-color: #218838;
+        }
+
+    label {
+        margin-left: 10px;
+    }
+
+    button, input[type="button"] {
+        width: 100%;
+        margin: 5px 0;
+    }
+
+    input[type="text"], input[type="file"] {
+        width: 100%;
+        padding: 8px;
+        margin: 10px 0;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+    }
+
+    table#csvTable {
+        width: 100%;
+    }
+
+        table#csvTable th {
+            text-align: left;
+        }
+
+    .error-container {
+        position: relative;
+    }
+
+    .error-message {
+        width: 100%;
+        height: 40px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        cursor: pointer;
+        box-sizing: border-box;
+    }
+
+    .error-tooltip {
+        display: none;
+        position: absolute;
+        left: 0;
+        top: 100%;
+        width: 300px;
+        max-width: 300px;
+        background-color: #fff;
+        border: 1px solid #ccc;
+        z-index: 10;
+        padding: 10px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        border-radius: 4px;
+    }
+
+    .error-container:hover .error-tooltip {
+        display: block;
+        overflow: auto;
+        white-space: normal;
+    }
+
+
+    .error-cell {
+        background-color: #ffcccc; 
+    }
+</style>
+
+<div>
+    <input type="text"
+           id="filterInput"
+           onkeyup="filterTable()"
+           placeholder="Search for all columns"
+           title="Search for all columns">
+
+    <table id="csvTable">
+        <thead>
+            <tr class="header">
+                <th onclick="sortTable(0)">Name</th>
+                <th onclick="sortTable(1)">Date of Birth</th>
+                <th onclick="sortTable(2)">Married</th>
+                <th onclick="sortTable(3)">Phone</th>
+                <th onclick="sortTable(4)">Salary</th>
+                <th onclick="sortTable(5)">Error Message</th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (Model != null)
+            {
+                @foreach (var item in Model)
+                {
+                    <tr>
+                        <td><input value="@item.Name"></td>
+                        <td><input value="@item.DateOfBirth"></td>
+                        <td><input value="@item.Married"></td>
+                        <td><input value="@item.Phone"></td>
+                        <td><input value="@item.Salary"></td>
+                        <td class="@(string.IsNullOrEmpty(item.ErrorMessage) ? "" : "error-cell")">
+                            @if (!string.IsNullOrEmpty(item.ErrorMessage))
+                            {
+                                <div class="error-container">
+                                    <span class="error-message" title="@item.ErrorMessage">
+                                        <input value="@(item.ErrorMessage.Length > 30 ? item.ErrorMessage.Substring(0, 30) + "..." : item.ErrorMessage)" />
+                                    </span>
+                                    <div class="error-tooltip">@item.ErrorMessage</div>
+                                </div>
+                            }
+                        </td>
+                    </tr>
+                }
+            }
+        </tbody>
+    </table>
+
+    @* Upload Document Section *@
+    <h3>Upload Document</h3>
+    <div>
+        @using (Html.BeginForm("Upload", "Home", FormMethod.Post, new { enctype = "multipart/form-data" }))
+        {
+            <table style="width: 100%;">
+                <tr>
+                    <td>
+                        <label for="file">Select a file to upload:</label>
+                    </td>
+                    <td style="width: 45%;">
+                        <input type="file" name="file" id="file" required onchange="enableSaveButton()" />
+                    </td>
+                    <td>
+                        <button type="submit">Upload</button>
+                    </td>
+                    <td>
+                        <input @(Model != null && Model.Any(a => !string.IsNullOrEmpty(a.ErrorMessage)) ? "disabled=true" : Model == null ? "disabled=true" : "") onclick="saveToDb()" type="button" id="saveDb" value="Save All" />
+                    </td>
+                    <td>
+                        <input type="checkbox" id="errorMessage" onclick="enableSaveButton()">
+                        <label for="errorMessage"> Ignore rows with error value</label>
+                    </td>
+                </tr>
+            </table>
+        }
+
+        @if (ViewBag.Message != null)
+        {
+            <div>
+                <strong>@ViewBag.Message</strong>
+            </div>
+        }
+    </div>
+
+    <script>
+        let sortOrder = [true, true, true, true, true];
+
+        function sortTable(columnIndex) {
+            const table = document.getElementById("csvTable");
+            const rows = Array.from(table.rows).slice(1);
+            const isAscending = sortOrder[columnIndex];
+
+            rows.sort((a, b) => {
+                const x = a.getElementsByTagName("TD")[columnIndex].getElementsByTagName("DIV")[0].innerHTML;
+                const y = b.getElementsByTagName("TD")[columnIndex].getElementsByTagName("DIV")[0].innerHTML;
+
+                return isAscending ? (x > y ? 1 : -1) : (x < y ? 1 : -1);
+            });
+
+            rows.forEach(row => table.appendChild(row));
+            sortOrder[columnIndex] = !isAscending;
+        }
+
+        function filterTable() {
+            const trs = document.querySelectorAll('#csvTable tr:not(.header)')
+            const filter = document.querySelector('#filterInput').value
+            const regex = new RegExp(filter, 'i')
+            const isFoundInTds = td => regex.test(td.innerHTML)
+            const isFound = childrenArr => childrenArr.some(isFoundInTds)
+            const setTrStyleDisplay = ({ style, children }) => {
+                style.display = isFound([...children]) ? '' : 'none'
+            }
+
+            trs.forEach(setTrStyleDisplay)
+        }
+
+        function saveToDb() {
+            var persons = [];
+            $("#csvTable TBODY TR").each(function () {
+                var row = $(this);
+                var person = {};
+
+                person.Name = row.find("TD").eq(0).find("input").val();
+                person.DateOfBirth = row.find("TD").eq(1).find("input").val();
+                person.Married = row.find("TD").eq(2).find("input").val();
+                person.Phone = row.find("TD").eq(3).find("input").val();
+                person.Salary = row.find("TD").eq(4).find("input").val();
+                person.ErrorMessage = row.find("TD").eq(5).find("input").val();
+                persons.push(person);
+            });
+
+            var personVM = {};
+            personVM.personDtos = persons;
+
+
+            $.ajax({
+                type: "POST",
+                url: "/Home/SaveToDb",
+                data: JSON.stringify(personVM),
+                contentType: "application/json; charset=utf-8",
+                dataType: "json",
+                success: function (r) {
+                    alert(r + " record(s) inserted.");
+                }
+            });
+        }
+
+        function enableSaveButton() {
+            const fileInput = document.getElementById('file');
+            const errorMessageCheckbox = document.getElementById('errorMessage');
+            const saveButton = document.getElementById('saveDb');
+
+            const csvTableBody = document.querySelector('#csvTable tbody');
+            const rowCount = csvTableBody ? csvTableBody.rows.length : 0;
+
+            if (rowCount > 0 && errorMessageCheckbox.checked) {
+                saveButton.removeAttribute('disabled');
+            } else {
+                saveButton.setAttribute('disabled', 'true');
+            }
+        }
+
+    </script>
+</div>
